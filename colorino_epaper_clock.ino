@@ -127,11 +127,11 @@ void updateClock() {
    display.setFont(&Ubuntu_M16pt8b);
     
    // Day 01, Month  cursor location x,y
-//   display.setCursor(14,22);  
-//   display.setTextColor(EPD_DGRAY);
-//   display.print(display.readTemperature()); // Only Celsious in this library
-//   display.print("C");
-//   display.setTextColor(textColor);
+   display.setCursor(14,25);  
+   display.setTextColor(EPD_DGRAY);
+   display.print(display.readTemperature()); // Only Celsious in this library
+   display.print("C");
+   display.setTextColor(textColor);
    
    if (debugVerbose) {
     printf("updateClock() called\n");
