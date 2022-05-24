@@ -32,12 +32,7 @@
 #include "esp_sleep.h"
 
 #include "Adafruit_GFX.h"
-// 1st: Edit in Pl_microEPD.h the right Width / Height for Adafruit GFX instantiation
-//#define EPD_WIDTH   (72)
-//#define EPD_HEIGHT  (148)
-
-  
-#include "PL_microEPD.h"
+#include "PL_smallLegio.h"
 /**
 SPI_MOSI=23
 SPI_MISO=19
@@ -46,16 +41,20 @@ SPI_CS=5
 RST=21  --> Needs to be modified in Paperino lib
 BUSY=33 ----^  
 */
-#define EPD_CS      5
-PL_microEPD display(EPD_CS, 21, 33);  
+
+#define EPD_CS   5
+#define EPD_RST  21
+#define EPD_BUSY 33
+PL_smallLegio display(EPD_CS, EPD_RST, EPD_BUSY);
 
 // 2nd: Use forceSync true in first run so it syncs time and saves into Non Volatile Storage (NVS)
 //      After first flash should be always false since on true will connect to WiFi every time!
 bool forceSync = false;    
-
+uint8_t epd_color1;
+uint8_t epd_color2;
 // 3rd: Update with your WiFi credentials
 #define CONFIG_ESP_WIFI_SSID "sagemcom6AE0"
-#define CONFIG_ESP_WIFI_PASSWORD ""
+#define CONFIG_ESP_WIFI_PASSWORD "GTZZGJN52NXQZY"
 
 #define CONFIG_ESP_MAXIMUM_RETRY 2
 bool debugVerbose = false;
@@ -75,7 +74,7 @@ int sleepMinutes = 2;
 
 // At what time your CLOCK will get in Sync with the internet time?
 // Clock syncs with internet time in this two SyncHours. Leave it on -1 to avoid internet Sync (Leave at least one set otherwise it will never get synchronized)
-uint8_t syncHour1 = 0;       // IMPORTANT: Leave it on 0 for the first run!    On -1 to not sync at this hour
+uint8_t syncHour1 = 7;       // IMPORTANT: Leave it on 0 for the first run!    On -1 to not sync at this hour
 uint8_t syncHour2 = 12;       // Same here, 2nd request to Sync hour 
 // This microsCorrection represents the program time and will be discounted from deepsleep
 // Fine correction: Handle with care since this will be corrected on each sleepMinutes period
@@ -117,27 +116,51 @@ void deepsleep(){
     esp_deep_sleep(1000000LL * 60 * sleepMinutes - microsCorrection);
 }
 
+void updateDisplay(int color) {
+  display.updateLegio(EPD_BLACK);
+  display.clear();
+  updateClock(epd_color2);
+  switch(color) {
+    case 4:
+     display.updateLegio(EPD_YELLOW);
+    break;
+    // Green
+    case 5:
+     display.updateLegio(EPD_YELLOW);
+     display.clear();
+     
+     updateClock(epd_color2);
+     display.updateLegio(EPD_GREEN);
+     // Red
+    case 6:
+     display.updateLegio(EPD_RED);
+    break;
+    default:
+     display.updateLegio(EPD_BLUE);
+  }
+  return;
+}
 
-void updateClock() {
+
+void updateClock(int back_color) {
     // Half of display -NN should be the sum of pix per font
    uint8_t fontSpace = (fontSize/2); // Calculate aprox. how much space we need per font Character
 
    //display.clear();
-   display.fillScreen(backgroundColor);
+   //display.fillScreen(back_color);
    display.setFont(&Ubuntu_M16pt8b);
     
    // Day 01, Month  cursor location x,y
-   display.setCursor(14,25);  
-   display.setTextColor(EPD_DGRAY);
+   display.setCursor(14,25);
    display.print(display.readTemperature()); // Only Celsious in this library
    display.print("C");
-   display.setTextColor(textColor);
    
    if (debugVerbose) {
     printf("updateClock() called\n");
     printf("display.print() Day, month: %s\n\n", nvs_day_month);
     }
-    uint8_t xpos = random(EPD_WIDTH-100);
+    randomSeed(random(6000));
+    uint8_t xpos = random(EPD_HEIGHT-160)+64; // Some x space for temperature (240 is total)
     display.setCursor(xpos,25);
     display.setFont(&Ubuntu_M16pt8b);
     display.print(nvs_day_month);
@@ -193,34 +216,17 @@ void updateClock() {
    // switch(display.width()) expression used as a function (?)
    uint16_t x = 5;
    uint16_t y = 100;
-   uint8_t color1 = random(3);
-   display.setTextColor(color1);
-   
-   uint8_t color2 = random(2)+1;
+   uint8_t x_rand = random(2)+1;
    uint16_t y_disp1 = y + random(10); 
    uint16_t y_disp2 = y + random(10);
    uint16_t y_disp3 = y + random(10);
    uint16_t x_min = (fontSize==48) ? 14 : 7;
-   display.setCursor(x+color2, y_disp1);
+   display.setCursor(x+x_rand, y_disp1);
    display.printf("%s",hourBuffer);
-   display.setCursor(x+color2+color1+(fontSize*2)+7, y_disp2);
+   display.setCursor(x+x_rand+(fontSize*2)+7, y_disp2);
    display.print(":");
-   display.setCursor(x+(fontSize*3)-x_min-color1, y_disp3);
-   display.printf("%s",minuteBuffer);
-   
-   
-   display.setTextColor(color2);
-   x++;
-   y++;
-   
-   display.setCursor(x+color2, y_disp1);
-   display.printf("%s",hourBuffer);
-   display.setCursor(x+color2+color1+(fontSize*2)+7, y_disp2);
-   display.print(":");
-   display.setCursor(x+(fontSize*3)-x_min-color1, y_disp3);
-   display.printf("%s",minuteBuffer);
-   display.update(); 
-   
+   display.setCursor(x+(fontSize*3)-x_min, y_disp3);
+   display.printf("%s",minuteBuffer); 
 }
 
 esp_err_t _http_event_handler(esp_http_client_event_t *evt)
@@ -435,14 +441,22 @@ void wifi_init_sta(void)
 
 void setup() {
   Serial.begin(115200);
-
+  epd_color1=random(4)+4;
+  randomSeed(random(6000));
+  epd_color2=random(4)+4;
+  printf("epd_color1:%d 2:%d\n", epd_color1, epd_color2);
+  
   SPI.begin();                    
   SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));  
-  display.begin();
-  display.setRotation(1);
+  display.begin(EPD_BLACK);
+  
+  //display.fillRect(0,0,EPD_HEIGHT,EPD_WIDTH, EPD_WHITE);  
+  display.setTextColor(EPD_BLACK);
 }
+
 void loop()
 {
+  
     uint64_t startTime = esp_timer_get_time();
     // Initialize NVS
     esp_err_t err = nvs_flash_init();
@@ -454,8 +468,8 @@ void loop()
     }
     ESP_ERROR_CHECK( err );
     
-    printf("ESP32 deepsleep clock\n");
-    printf("Free heap memory: %d\n", xPortGetFreeHeapSize()); // Keep this above 100Kb to have a stable Firmware (Fonts take Heap!)
+    //printf("ESP32 deepsleep clock\n");
+    //printf("Free heap memory: %d\n", xPortGetFreeHeapSize()); // Keep this above 100Kb to have a stable Firmware (Fonts take Heap!)
 
     // Turn off neopixel to keep consumption to the minimum
     gpio_set_direction((gpio_num_t)DOTSTAR_PWR, GPIO_MODE_OUTPUT);
@@ -498,7 +512,8 @@ void loop()
             printf((err != ESP_OK) ? "Failed last_sync_h!\n" : "Done storing last_sync_h\n");
          }
       // After reading let's print the hour:
-      updateClock();
+      updateClock(epd_color2);
+      updateDisplay(epd_color1); 
 
         // Write NVS data so is read in next wakeup
         nvs_minute+=sleepMinutes;
@@ -546,8 +561,8 @@ void loop()
    // Calculate how much this program took to run and discount it from deepsleep
    uint32_t endTime = esp_timer_get_time();
    microsCorrection += endTime-startTime;
-
+   delay(5000);
    printf("deepsleep for %d minutes. microsCorrection: %lld\n", sleepMinutes, microsCorrection);
-
+   
    deepsleep();
 }
