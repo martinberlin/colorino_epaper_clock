@@ -52,6 +52,7 @@ PL_smallLegio display(EPD_CS, EPD_RST, EPD_BUSY);
 bool forceSync = false;    
 uint8_t epd_color1;
 uint8_t epd_color2;
+int initial_temperature = 0;
 // 3rd: Update with your WiFi credentials
 #define CONFIG_ESP_WIFI_SSID "sagemcom6AE0"
 #define CONFIG_ESP_WIFI_PASSWORD "GTZZGJN52NXQZY"
@@ -111,6 +112,7 @@ int8_t nvs_minute = 0;
 int8_t nvs_last_sync_hour = 0;
 
 size_t sizeof_day_month = sizeof(nvs_day_month);
+uint16_t long_update = 0;
 
 void deepsleep(){
     esp_deep_sleep(1000000LL * 60 * sleepMinutes - microsCorrection);
@@ -122,15 +124,18 @@ void updateDisplay(int color) {
     case 1:
       display.updateLegio(EPD_BLACK);
       break;
+
     case 2:
+     long_update = 1000;
      display.updateLegio(EPD_RED); 
-     display.clear();  
+     display.clear();
      updateClock(epd_color2);
      display.updateLegio(EPD_GREEN);
      break;
+     
     case 3:
+     long_update = 1000;
      display.updateLegio(EPD_RED); 
-     display.clear();  
      updateClock(epd_color2);
      display.updateLegio(EPD_BLUE);
      break;
@@ -138,18 +143,23 @@ void updateDisplay(int color) {
     case 4:
      display.updateLegio(EPD_YELLOW);
     break;
+    
     // Green
     case 5:
+     long_update = 1000;
      display.updateLegio(EPD_YELLOW); 
-     display.clear();  
      updateClock(epd_color2);
      display.updateLegio(EPD_GREEN);
-     // Red
+     break;
+     
+    // Red
     case 6:
      display.updateLegio(EPD_RED);
     break;
+    
     default:
      display.updateLegio(EPD_BLUE);
+     break;
   }
   return;
 }
@@ -158,26 +168,22 @@ void updateDisplay(int color) {
 void updateClock(int back_color) {
     // Half of display -NN should be the sum of pix per font
    uint8_t fontSpace = (fontSize/2); // Calculate aprox. how much space we need per font Character
-
    display.clear();
-   display.setTextColor(EPD_BLACK);
-   //gidisplay.fillScreen(back_color);
+   //display.fillScreen(back_color);
    display.setFont(&Ubuntu_M16pt8b);
     
    // Day 01, Month  cursor location x,y
    display.setCursor(14,25);
-   display.print(display.readTemperature()); // Only Celsious in this library
+   display.print(initial_temperature); // Only Celsious in this library
    display.print("C");
    
    if (debugVerbose) {
     printf("updateClock() called\n");
     printf("display.print() Day, month: %s\n\n", nvs_day_month);
     }
-    randomSeed(random(6000));
     uint8_t xpos = EPD_HEIGHT-160; // Some x space for temperature (240 is total)
     display.setCursor(xpos,25);
     display.setFont(&Ubuntu_M16pt8b);
-    display.setTextColor(EPD_BLACK);
     display.print(nvs_day_month);
    /**
     * set font depending on selected fontSize
@@ -200,7 +206,7 @@ void updateClock(int back_color) {
    }
    // HH:mm cursor location depending on display width. Add more case's to adapt the cursor to your display size
    // switch(display.width()) expression used as a function (?)
-        display.setCursor(5, 63);
+   display.setCursor(5, 63);
       
    
    // NVS to char array. Extract from NVS value and pad with 0 to string in case <10
@@ -230,9 +236,9 @@ void updateClock(int back_color) {
    uint16_t x = 5;
    uint16_t y = 100;
    uint8_t x_rand = random(2)+1;
-   uint16_t y_disp1 = y + random(10); 
-   uint16_t y_disp2 = y + random(10);
-   uint16_t y_disp3 = y + random(10);
+   uint16_t y_disp1 = y + random(5); 
+   uint16_t y_disp2 = y + random(5);
+   uint16_t y_disp3 = y + random(5);
    uint16_t x_min = (fontSize==48) ? 14 : 7;
    display.setCursor(x+x_rand, y_disp1);
    display.printf("%s",hourBuffer);
@@ -452,20 +458,6 @@ void wifi_init_sta(void)
     vEventGroupDelete(s_wifi_event_group);
 }
 
-void setup() {
-  Serial.begin(115200);
-  epd_color1=random(4)+4; // Background
-  randomSeed(random(6000));
-  epd_color2=random(6)+1; // Text color: random(6)+1
-  printf("epd_color1:%d 2:%d\n", epd_color1, epd_color2);
-  
-  SPI.begin();                    
-  SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));  
-  display.begin(EPD_WHITE);
-  display.fillScreen(EPD_WHITE);
-  display.updateLegio(EPD_BLACK);
-}
-
 void loop()
 {
   
@@ -488,8 +480,6 @@ void loop()
     gpio_set_pull_mode((gpio_num_t)DOTSTAR_CLK, GPIO_PULLDOWN_ONLY);
     gpio_set_pull_mode((gpio_num_t)DOTSTAR_DATA, GPIO_PULLDOWN_ONLY);
     gpio_set_level((gpio_num_t)DOTSTAR_PWR, 0);
-
-   
 
     nvs_handle_t my_handle;
     err = nvs_open("storage", NVS_READWRITE, &my_handle);
@@ -524,13 +514,12 @@ void loop()
             printf((err != ESP_OK) ? "Failed last_sync_h!\n" : "Done storing last_sync_h\n");
          }
 
-         
-      // After reading let's print the hour:
-      updateClock(EPD_BLACK);
-      updateDisplay(EPD_BLACK); 
-      updateClock(epd_color2);
-      updateDisplay(epd_color1); 
-
+      // Update clock
+      updateClock(epd_color1);
+      display.updateLegio(EPD_BLACK);
+      updateClock(epd_color1);
+      updateDisplay(epd_color1);
+      
         // Write NVS data so is read in next wakeup
         nvs_minute+=sleepMinutes;
         // TODO Keep in mind that here sleepMinutes can be > 60 and that overpassing minutes need to be summed to 0
@@ -577,8 +566,24 @@ void loop()
    // Calculate how much this program took to run and discount it from deepsleep
    uint32_t endTime = esp_timer_get_time();
    microsCorrection += endTime-startTime;
-   delay(5000);
-   printf("deepsleep for %d minutes. microsCorrection: %lld\n", sleepMinutes, microsCorrection);
+   delay(long_update);
    
+   printf("deepsleep %d mins. microsCorr: %lld\n", sleepMinutes, microsCorrection);
    deepsleep();
+}
+
+void setup() {
+  Serial.begin(115200);
+  randomSeed(random(6000));
+  epd_color1=random(6)+1; // Background, test green: 5
+  randomSeed(random(6000));
+  epd_color2=random(6)+1; // Text color: random(6)+1
+  printf("epd_color1:%d <-- MAIN 2:%d\n", epd_color1, epd_color2);
+  
+  SPI.begin();                    
+  SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));  
+  // According to this example: https://github.com/plasticlogic/PL_smallEPD/blob/main/example/02_GFX/02_GFX.ino#L15
+  // Initial color /background is WHITE
+  display.begin(EPD_WHITE);
+  initial_temperature = display.readTemperature();
 }
