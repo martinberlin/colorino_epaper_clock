@@ -75,11 +75,11 @@ int sleepMinutes = 2;
 
 // At what time your CLOCK will get in Sync with the internet time?
 // Clock syncs with internet time in this two SyncHours. Leave it on -1 to avoid internet Sync (Leave at least one set otherwise it will never get synchronized)
-uint8_t syncHour1 = 7;       // IMPORTANT: Leave it on 0 for the first run!    On -1 to not sync at this hour
+uint8_t syncHour1 = 20;       // IMPORTANT: Leave it on 0 for the first run!    On -1 to not sync at this hour
 uint8_t syncHour2 = 12;       // Same here, 2nd request to Sync hour 
 // This microsCorrection represents the program time and will be discounted from deepsleep
 // Fine correction: Handle with care since this will be corrected on each sleepMinutes period
-int64_t microsCorrection = 2990000; // Predicted boot time?
+int64_t microsCorrection = 5990000; // Predicted boot time + epaper update?
 
 uint16_t backgroundColor = EPD_WHITE;
 uint16_t textColor = EPD_BLACK;
@@ -118,29 +118,62 @@ void deepsleep(){
     esp_deep_sleep(1000000LL * 60 * sleepMinutes - microsCorrection);
 }
 
+void colorToChar(int color) {
+  char randColor[18];
+    switch(color) {
+    case 1:
+     strlcpy(randColor, "Black", sizeof(randColor));
+     break;
+    case 2:
+     strlcpy(randColor, "Red/Green", sizeof(randColor));
+     break;
+    case 3:
+     strlcpy(randColor, "Red/Blue", sizeof(randColor));
+     break;
+    case 4:
+     strlcpy(randColor, "Yellow", sizeof(randColor));
+     break;
+    case 5:
+     strlcpy(randColor, "Green", sizeof(randColor));
+     break;
+    case 6:
+     strlcpy(randColor, "Red", sizeof(randColor));
+     break;
+    default:
+     strlcpy(randColor, "Blue", sizeof(randColor));
+    }
+    
+  display.setFont(&Ubuntu_M8pt8b);
+  display.setCursor(20, EPD_WIDTH-20);
+  display.printf("%s", randColor);
+  return;
+}
+
 void updateDisplay(int color) {
-  
+  colorToChar(color);
+   
   switch(color) {
     case 1:
-      display.updateLegio(EPD_BLACK);
-      break;
+     display.updateLegio(EPD_BLACK);
+     break;
 
     case 2:
      long_update = 1000;
      display.updateLegio(EPD_RED); 
      display.clear();
-     updateClock(epd_color2);
+     updateClock();
      display.updateLegio(EPD_GREEN);
      break;
      
     case 3:
      long_update = 1000;
      display.updateLegio(EPD_RED); 
-     updateClock(epd_color2);
+     updateClock();
      display.updateLegio(EPD_BLUE);
      break;
      
     case 4:
+     long_update = 1000;
      display.updateLegio(EPD_YELLOW);
     break;
     
@@ -148,7 +181,7 @@ void updateDisplay(int color) {
     case 5:
      long_update = 1000;
      display.updateLegio(EPD_YELLOW); 
-     updateClock(epd_color2);
+     updateClock();
      display.updateLegio(EPD_GREEN);
      break;
      
@@ -165,11 +198,10 @@ void updateDisplay(int color) {
 }
 
 
-void updateClock(int back_color) {
+void updateClock() {
     // Half of display -NN should be the sum of pix per font
    uint8_t fontSpace = (fontSize/2); // Calculate aprox. how much space we need per font Character
    display.clear();
-   //display.fillScreen(back_color);
    display.setFont(&Ubuntu_M16pt8b);
     
    // Day 01, Month  cursor location x,y
@@ -515,9 +547,10 @@ void loop()
          }
 
       // Update clock
-      updateClock(epd_color1);
-      display.updateLegio(EPD_BLACK);
-      updateClock(epd_color1);
+      updateClock();
+      display.updateLegio(epd_color2); // EPD_BLACK
+      updateClock();
+      
       updateDisplay(epd_color1);
       
         // Write NVS data so is read in next wakeup
@@ -565,9 +598,8 @@ void loop()
 
    // Calculate how much this program took to run and discount it from deepsleep
    uint32_t endTime = esp_timer_get_time();
-   microsCorrection += endTime-startTime;
+   microsCorrection += endTime - startTime + (long_update*1000);
    delay(long_update);
-   
    printf("deepsleep %d mins. microsCorr: %lld\n", sleepMinutes, microsCorrection);
    deepsleep();
 }
