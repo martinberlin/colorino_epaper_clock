@@ -120,15 +120,14 @@ void updateDisplay(int color) {
   display.updateLegio(EPD_BLACK);
   display.clear();
   updateClock(epd_color2);
+  
   switch(color) {
     case 4:
      display.updateLegio(EPD_YELLOW);
     break;
     // Green
     case 5:
-     display.updateLegio(EPD_YELLOW);
-     display.clear();
-     
+     display.updateLegio(EPD_YELLOW);   
      updateClock(epd_color2);
      display.updateLegio(EPD_GREEN);
      // Red
@@ -146,8 +145,8 @@ void updateClock(int back_color) {
     // Half of display -NN should be the sum of pix per font
    uint8_t fontSpace = (fontSize/2); // Calculate aprox. how much space we need per font Character
 
-   //display.clear();
-   //display.fillScreen(back_color);
+   display.clear();
+   display.fillScreen(back_color);
    display.setFont(&Ubuntu_M16pt8b);
     
    // Day 01, Month  cursor location x,y
@@ -160,12 +159,10 @@ void updateClock(int back_color) {
     printf("display.print() Day, month: %s\n\n", nvs_day_month);
     }
     randomSeed(random(6000));
-    uint8_t xpos = random(EPD_HEIGHT-160)+64; // Some x space for temperature (240 is total)
+    uint8_t xpos = EPD_HEIGHT-160; // Some x space for temperature (240 is total)
     display.setCursor(xpos,25);
     display.setFont(&Ubuntu_M16pt8b);
     display.print(nvs_day_month);
-
-  fontSize = (random(2) == 1) ? 48 : 36;
    /**
     * set font depending on selected fontSize
     */
