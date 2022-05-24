@@ -117,17 +117,31 @@ void deepsleep(){
 }
 
 void updateDisplay(int color) {
-  display.updateLegio(EPD_BLACK);
-  display.clear();
-  updateClock(epd_color2);
   
   switch(color) {
+    case 1:
+      display.updateLegio(EPD_BLACK);
+      break;
+    case 2:
+     display.updateLegio(EPD_RED); 
+     display.clear();  
+     updateClock(epd_color2);
+     display.updateLegio(EPD_GREEN);
+     break;
+    case 3:
+     display.updateLegio(EPD_RED); 
+     display.clear();  
+     updateClock(epd_color2);
+     display.updateLegio(EPD_BLUE);
+     break;
+     
     case 4:
      display.updateLegio(EPD_YELLOW);
     break;
     // Green
     case 5:
-     display.updateLegio(EPD_YELLOW);   
+     display.updateLegio(EPD_YELLOW); 
+     display.clear();  
      updateClock(epd_color2);
      display.updateLegio(EPD_GREEN);
      // Red
@@ -146,7 +160,8 @@ void updateClock(int back_color) {
    uint8_t fontSpace = (fontSize/2); // Calculate aprox. how much space we need per font Character
 
    display.clear();
-   display.fillScreen(back_color);
+   display.setTextColor(EPD_BLACK);
+   //gidisplay.fillScreen(back_color);
    display.setFont(&Ubuntu_M16pt8b);
     
    // Day 01, Month  cursor location x,y
@@ -162,6 +177,7 @@ void updateClock(int back_color) {
     uint8_t xpos = EPD_HEIGHT-160; // Some x space for temperature (240 is total)
     display.setCursor(xpos,25);
     display.setFont(&Ubuntu_M16pt8b);
+    display.setTextColor(EPD_BLACK);
     display.print(nvs_day_month);
    /**
     * set font depending on selected fontSize
@@ -438,17 +454,16 @@ void wifi_init_sta(void)
 
 void setup() {
   Serial.begin(115200);
-  epd_color1=random(4)+4;
+  epd_color1=random(4)+4; // Background
   randomSeed(random(6000));
-  epd_color2=random(4)+4;
+  epd_color2=random(6)+1; // Text color: random(6)+1
   printf("epd_color1:%d 2:%d\n", epd_color1, epd_color2);
   
   SPI.begin();                    
   SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));  
-  display.begin(EPD_BLACK);
-  
-  //display.fillRect(0,0,EPD_HEIGHT,EPD_WIDTH, EPD_WHITE);  
-  display.setTextColor(EPD_BLACK);
+  display.begin(EPD_WHITE);
+  display.fillScreen(EPD_WHITE);
+  display.updateLegio(EPD_BLACK);
 }
 
 void loop()
@@ -508,7 +523,11 @@ void loop()
             err = nvs_set_i8(my_handle, "last_sync_h", nvs_hour);
             printf((err != ESP_OK) ? "Failed last_sync_h!\n" : "Done storing last_sync_h\n");
          }
+
+         
       // After reading let's print the hour:
+      updateClock(EPD_BLACK);
+      updateDisplay(EPD_BLACK); 
       updateClock(epd_color2);
       updateDisplay(epd_color1); 
 
