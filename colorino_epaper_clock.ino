@@ -75,11 +75,11 @@ int sleepMinutes = 2;
 
 // At what time your CLOCK will get in Sync with the internet time?
 // Clock syncs with internet time in this two SyncHours. Leave it on -1 to avoid internet Sync (Leave at least one set otherwise it will never get synchronized)
-uint8_t syncHour1 = 20;       // IMPORTANT: Leave it on 0 for the first run!    On -1 to not sync at this hour
-uint8_t syncHour2 = 12;       // Same here, 2nd request to Sync hour 
+uint8_t syncHour1 = 16;       // IMPORTANT: Leave it on 0 for the first run!    On -1 to not sync at this hour
+uint8_t syncHour2 = 9;       // Same here, 2nd request to Sync hour 
 // This microsCorrection represents the program time and will be discounted from deepsleep
 // Fine correction: Handle with care since this will be corrected on each sleepMinutes period
-int64_t microsCorrection = 5990000; // Predicted boot time + epaper update?
+int64_t microsCorrection = 9990000; // Predicted boot time + epaper update?
 
 uint16_t backgroundColor = EPD_WHITE;
 uint16_t textColor = EPD_BLACK;
@@ -112,7 +112,6 @@ int8_t nvs_minute = 0;
 int8_t nvs_last_sync_hour = 0;
 
 size_t sizeof_day_month = sizeof(nvs_day_month);
-uint16_t long_update = 0;
 
 void deepsleep(){
     esp_deep_sleep(1000000LL * 60 * sleepMinutes - microsCorrection);
@@ -149,16 +148,20 @@ void colorToChar(int color) {
   return;
 }
 
+uint16_t long_update = 1000;
+
 void updateDisplay(int color) {
+  
   colorToChar(color);
-   
+  
+  // Sequence: Black, Red, Yellow, Green
   switch(color) {
     case 1:
      display.updateLegio(EPD_BLACK);
      break;
 
     case 2:
-     long_update = 1000;
+     display.updateLegio(EPD_BLACK);
      display.updateLegio(EPD_RED); 
      display.clear();
      updateClock();
@@ -166,27 +169,34 @@ void updateDisplay(int color) {
      break;
      
     case 3:
-     long_update = 1000;
+     display.updateLegio(EPD_BLACK);
      display.updateLegio(EPD_RED); 
+     display.clear();
      updateClock();
      display.updateLegio(EPD_BLUE);
      break;
      
     case 4:
-     long_update = 1000;
+     display.updateLegio(EPD_BLACK);
+     display.updateLegio(EPD_RED);
+     display.clear();
+     updateClock();
      display.updateLegio(EPD_YELLOW);
     break;
     
     // Green
     case 5:
-     long_update = 1000;
-     display.updateLegio(EPD_YELLOW); 
+     display.updateLegio(EPD_BLACK);
+     long_update += 1000;
+     display.updateLegio(EPD_YELLOW);
+     display.clear();
      updateClock();
      display.updateLegio(EPD_GREEN);
      break;
      
     // Red
     case 6:
+     display.updateLegio(EPD_BLACK);
      display.updateLegio(EPD_RED);
     break;
     
@@ -548,9 +558,6 @@ void loop()
 
       // Update clock
       updateClock();
-      display.updateLegio(epd_color2); // EPD_BLACK
-      updateClock();
-      
       updateDisplay(epd_color1);
       
         // Write NVS data so is read in next wakeup
@@ -596,7 +603,7 @@ void loop()
         nvs_close(my_handle);
     }
 
-   // Calculate how much this program took to run and discount it from deepsleep
+   // Calculate how much this program took to run and discount it from deepsleep 
    uint32_t endTime = esp_timer_get_time();
    microsCorrection += endTime - startTime + (long_update*1000);
    delay(long_update);
@@ -607,15 +614,18 @@ void loop()
 void setup() {
   Serial.begin(115200);
   randomSeed(random(6000));
-  epd_color1=random(6)+1; // Background, test green: 5
+  epd_color1=random(8)+1; // Text color: random(6)+1
   randomSeed(random(6000));
-  epd_color2=random(6)+1; // Text color: random(6)+1
+  epd_color2=random(6)+1; // Background, test green: 5
   printf("epd_color1:%d <-- MAIN 2:%d\n", epd_color1, epd_color2);
   
   SPI.begin();                    
   SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));  
   // According to this example: https://github.com/plasticlogic/PL_smallEPD/blob/main/example/02_GFX/02_GFX.ino#L15
   // Initial color /background is WHITE
-  display.begin(EPD_WHITE);
+  if (epd_color2 < 5 || epd_color1 == epd_color2) epd_color2 = EPD_WHITE;
+  // Possible to update with epd_color2 (Creates weird backgrounds) 
+  display.begin(EPD_BLACK);
+  display.setTextColor(textColor);
   initial_temperature = display.readTemperature();
 }
