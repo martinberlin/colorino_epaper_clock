@@ -124,10 +124,10 @@ void colorToChar(int color) {
      strlcpy(randColor, "Black", sizeof(randColor));
      break;
     case 2:
-     strlcpy(randColor, "Red/Green", sizeof(randColor));
+     strlcpy(randColor, "White/Red", sizeof(randColor));
      break;
     case 3:
-     strlcpy(randColor, "Red/Blue", sizeof(randColor));
+     strlcpy(randColor, "Black/Blue", sizeof(randColor));
      break;
     case 4:
      strlcpy(randColor, "Yellow", sizeof(randColor));
@@ -161,24 +161,21 @@ void updateDisplay(int color) {
      break;
 
     case 2:
-     display.updateLegio(EPD_BLACK);
-     display.updateLegio(EPD_RED); 
+     display.updateLegio(EPD_WHITE);
      display.clear();
      updateClock();
-     display.updateLegio(EPD_GREEN);
+     display.updateLegio(EPD_RED);
      break;
      
     case 3:
      display.updateLegio(EPD_BLACK);
-     display.updateLegio(EPD_RED); 
      display.clear();
      updateClock();
      display.updateLegio(EPD_BLUE);
      break;
-     
+    // Yellow
     case 4:
      display.updateLegio(EPD_BLACK);
-     display.updateLegio(EPD_RED);
      display.clear();
      updateClock();
      display.updateLegio(EPD_YELLOW);
@@ -197,10 +194,15 @@ void updateDisplay(int color) {
     // Red
     case 6:
      display.updateLegio(EPD_BLACK);
+     display.updateLegio(EPD_YELLOW);
      display.updateLegio(EPD_RED);
     break;
     
     default:
+     long_update += 1000;
+     display.updateLegio(EPD_WHITE);
+     display.clear();
+     updateClock();
      display.updateLegio(EPD_BLUE);
      break;
   }
